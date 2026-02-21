@@ -13,6 +13,8 @@ export default class SidebarMarkdownNotesProvider implements vscode.WebviewViewP
   public static readonly viewId = 'sidebarMarkdownNotes.webview';
 
   private _view?: vscode.WebviewView;
+  private _fileWatcher?: fs.FSWatcher;
+  private _lastSavedStateStr: string = '';
 
   private config = getConfig();
 
@@ -65,6 +67,7 @@ export default class SidebarMarkdownNotesProvider implements vscode.WebviewViewP
             // Read from vault and load into webview
             try {
               const fileData = fs.readFileSync(vaultFilePath, 'utf8');
+              this._lastSavedStateStr = fileData;
               const state = JSON.parse(fileData);
               this._view?.webview.postMessage({ type: 'loadState', value: state });
             } catch (err) {
@@ -72,9 +75,11 @@ export default class SidebarMarkdownNotesProvider implements vscode.WebviewViewP
             }
           } else {
             // Write legacy state to vault (Migration)
-            fs.writeFileSync(vaultFilePath, JSON.stringify(data.value, null, 2), 'utf8');
+            this._lastSavedStateStr = JSON.stringify(data.value, null, 2);
+            fs.writeFileSync(vaultFilePath, this._lastSavedStateStr, 'utf8');
             this._view?.webview.postMessage({ type: 'loadState', value: data.value });
           }
+          this._startWatching(vaultFilePath);
           break;
         }
         case 'saveState': {
@@ -85,8 +90,9 @@ export default class SidebarMarkdownNotesProvider implements vscode.WebviewViewP
             fs.mkdirSync(vaultDir, { recursive: true });
           }
           
-          const vaultFilePath = path.join(vaultDir, `workspace_notes_${workspaceHash}.json`);
-          fs.writeFileSync(vaultFilePath, JSON.stringify(data.value, null, 2), 'utf8');
+          const vaultFilePath = path.join(vaultDir, `notes_${workspaceHash}.json`);
+          this._lastSavedStateStr = JSON.stringify(data.value, null, 2);
+          fs.writeFileSync(vaultFilePath, this._lastSavedStateStr, 'utf8');
           break;
         }
         case 'exportPage': {
@@ -124,6 +130,34 @@ export default class SidebarMarkdownNotesProvider implements vscode.WebviewViewP
       return this.config.vaultPath;
     }
     return path.join(os.homedir(), '.sidebar-markdown-notes');
+  }
+
+  private _startWatching(vaultFilePath: string) {
+    if (this._fileWatcher) {
+      this._fileWatcher.close();
+      this._fileWatcher = undefined;
+    }
+
+    try {
+      this._fileWatcher = fs.watch(vaultFilePath, (eventType: any) => {
+        if (eventType === 'change' || eventType === 'rename') {
+          if (fs.existsSync(vaultFilePath)) {
+            try {
+              const fileData = fs.readFileSync(vaultFilePath, 'utf8');
+              if (fileData !== this._lastSavedStateStr) {
+                this._lastSavedStateStr = fileData;
+                const state = JSON.parse(fileData);
+                this._view?.webview.postMessage({ type: 'loadState', value: state });
+              }
+            } catch (err) {
+              // Ignore read errors during quick writes
+            }
+          }
+        }
+      });
+    } catch (e) {
+      // In case watcher fails
+    }
   }
 
   public resetData() {
