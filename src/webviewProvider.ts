@@ -2,6 +2,11 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+import * as crypto from 'crypto';
+
 import { getConfig } from './config';
 
 export default class SidebarMarkdownNotesProvider implements vscode.WebviewViewProvider {
@@ -37,7 +42,7 @@ export default class SidebarMarkdownNotesProvider implements vscode.WebviewViewP
 
     webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
-    webviewView.webview.onDidReceiveMessage((data) => {
+    webviewView.webview.onDidReceiveMessage((data: any) => {
       switch (data.type) {
         case 'log': {
           vscode.window.showInformationMessage(`${data.value}`);
@@ -47,10 +52,47 @@ export default class SidebarMarkdownNotesProvider implements vscode.WebviewViewP
           this.updateStatusBar(data.value);
           break;
         }
+        case 'init': {
+          const workspaceHash = this._getWorkspaceHash();
+          const vaultDir = this._getVaultDir();
+          
+          if (!fs.existsSync(vaultDir)) {
+            fs.mkdirSync(vaultDir, { recursive: true });
+          }
+          
+          const vaultFilePath = path.join(vaultDir, `notes_${workspaceHash}.json`);
+          if (fs.existsSync(vaultFilePath)) {
+            // Read from vault and load into webview
+            try {
+              const fileData = fs.readFileSync(vaultFilePath, 'utf8');
+              const state = JSON.parse(fileData);
+              this._view?.webview.postMessage({ type: 'loadState', value: state });
+            } catch (err) {
+              vscode.window.showErrorMessage('sidebar-markdown-notes: Failed to parse notes vault file.');
+            }
+          } else {
+            // Write legacy state to vault (Migration)
+            fs.writeFileSync(vaultFilePath, JSON.stringify(data.value, null, 2), 'utf8');
+            this._view?.webview.postMessage({ type: 'loadState', value: data.value });
+          }
+          break;
+        }
+        case 'saveState': {
+          const workspaceHash = this._getWorkspaceHash();
+          const vaultDir = this._getVaultDir();
+          
+          if (!fs.existsSync(vaultDir)) {
+            fs.mkdirSync(vaultDir, { recursive: true });
+          }
+          
+          const vaultFilePath = path.join(vaultDir, `workspace_notes_${workspaceHash}.json`);
+          fs.writeFileSync(vaultFilePath, JSON.stringify(data.value, null, 2), 'utf8');
+          break;
+        }
         case 'exportPage': {
           vscode.workspace.openTextDocument({ language: 'markdown' }).then((a: vscode.TextDocument) => {
-            vscode.window.showTextDocument(a, 1, false).then((e) => {
-              e.edit((edit) => {
+            vscode.window.showTextDocument(a, 1, false).then((e: any) => {
+              e.edit((edit: any) => {
                 edit.insert(new vscode.Position(0, 0), data.value);
               });
             });
@@ -60,12 +102,28 @@ export default class SidebarMarkdownNotesProvider implements vscode.WebviewViewP
       }
     });
 
-    vscode.workspace.onDidChangeConfiguration((e) => {
+    vscode.workspace.onDidChangeConfiguration((e: any) => {
       if (e.affectsConfiguration('sidebar-markdown-notes')) {
         this.config = getConfig();
         webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
+        
+        // Re-initialize state if they just changed the vault directory
+        this._view?.webview.postMessage({ type: 'init', value: undefined });
       }
     });
+  }
+
+  private _getWorkspaceHash(): string {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    const uriString = workspaceFolders && workspaceFolders.length > 0 ? workspaceFolders[0].uri.toString() : 'global';
+    return crypto.createHash('md5').update(uriString).digest('hex');
+  }
+
+  private _getVaultDir(): string {
+    if (this.config.vaultPath) {
+      return this.config.vaultPath;
+    }
+    return path.join(os.homedir(), '.sidebar-markdown-notes');
   }
 
   public resetData() {

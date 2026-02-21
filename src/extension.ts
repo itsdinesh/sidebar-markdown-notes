@@ -54,6 +54,22 @@ export function activate(context: vscode.ExtensionContext) {
       provider.exportPage();
     })
   );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('sidebar-markdown-notes.setVaultPath', async () => {
+      const uri = await vscode.window.showOpenDialog({
+        canSelectFiles: false,
+        canSelectFolders: true,
+        canSelectMany: false,
+        openLabel: 'Select Vault Directory'
+      });
+
+      if (uri && uri[0]) {
+        await vscode.workspace.getConfiguration('sidebar-markdown-notes').update('vaultPath', uri[0].fsPath, vscode.ConfigurationTarget.Global);
+        vscode.window.showInformationMessage(`Notes Vault path updated to: ${uri[0].fsPath}`);
+      }
+    })
+  );
 }
 
 // this method is called when your extension is deactivated

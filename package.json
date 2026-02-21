@@ -2,7 +2,7 @@
 	"name": "sidebar-markdown-notes",
 	"displayName": "sidebar-markdown-notes",
 	"description": "Take notes in your sidebar using markdown",
-	"version": "1.2.0",
+	"version": "1.3.0",
 	"publisher": "assisrMatheus",
 	"author": {
 		"email": "assisr.matheus@gmail.com",
@@ -29,8 +29,7 @@
 		"vscode": "^1.50.0"
 	},
 	"extensionKind": [
-		"ui",
-		"workspace"
+		"ui"
 	],
 	"categories": [
 		"Other"
@@ -82,6 +81,11 @@
 				"category": "Sidebar markdown notes",
 				"title": "Export page",
 				"icon": "$(symbol-reference)"
+			},
+			{
+				"command": "sidebar-markdown-notes.setVaultPath",
+				"category": "Sidebar markdown notes",
+				"title": "Set notes vault directory"
 			}
 		],
 		"menus": {
@@ -105,6 +109,11 @@
 					"command": "sidebar-markdown-notes.exportPage",
 					"group": "navigation@3",
 					"when": "view == sidebarMarkdownNotes.webview"
+				},
+				{
+					"command": "sidebar-markdown-notes.setVaultPath",
+					"group": "navigation@4",
+					"when": "view == sidebarMarkdownNotes.webview"
 				}
 			]
 		},
@@ -116,6 +125,12 @@
 						"type": "boolean",
 						"default": false,
 						"description": "Whether or not a left margin should be added to the main view. To align it with other elements"
+					},
+					"sidebar-markdown-notes.vaultPath": {
+						"type": "string",
+						"default": "",
+						"scope": "machine",
+						"description": "The absolute path to the directory where notes should be stored. If left empty, notes will be stored in a `.sidebar-markdown-notes` directory in your home directory."
 					}
 				}
 			}

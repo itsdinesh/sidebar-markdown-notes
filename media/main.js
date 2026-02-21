@@ -37,8 +37,14 @@
     version: 1
   };
 
-  // Gets the state or creates a new one if it doesn't exist
-  let currentState = vscode.getState() || initialState;
+  // Keep a copy of the old native state for migration purposes
+  let currentState = initialState;
+  const legacyState = vscode.getState();
+  
+  // Prompt the extension to give us the latest vault state.
+  // We send the legacy state so the backend can automatically migrate it
+  // if this is the very first time the vault is being created.
+  vscode.postMessage({ type: 'init', value: legacyState || initialState });
 
   // Set the options for the maked markdown parser
   marked.setOptions({
@@ -137,10 +143,13 @@
   };
 
   const saveState = (newState) => {
-    // Save the state
+    // Save to the webview state (purely for quick visual reloads within the same session if needed, though mostly redundant now for persistence)
     vscode.setState(newState);
     // Updates current instance
     currentState = newState;
+
+    // Persist real source of truth to the extension backend's vault
+    vscode.postMessage({ type: 'saveState', value: newState });
 
     renderView();
   };
@@ -254,6 +263,15 @@
         exportPage();
         break;
       }
+      case 'loadState': {
+        // Hydrate from the file vault
+        if (message.value) {
+          currentState = message.value;
+          vscode.setState(currentState);
+          renderView();
+        }
+        break;
+      }
     }
   });
 
@@ -268,6 +286,5 @@
     debouncedSaveContent();
   });
 
-  // Runs the render for the first time
-  renderView();
+  // Removed immediate renderView() here because we wait for the 'loadState' message from the backend first.
 })();

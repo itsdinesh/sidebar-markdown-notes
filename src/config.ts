@@ -10,6 +10,10 @@ class Config {
   get leftMargin() {
     return !!this.config.get('leftMargin', false);
   }
+
+  get vaultPath(): string {
+    return this.config.get('vaultPath', '');
+  }
 }
 
 export function getConfig() {
