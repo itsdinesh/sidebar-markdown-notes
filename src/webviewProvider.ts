@@ -139,8 +139,11 @@ export default class SidebarMarkdownNotesProvider implements vscode.WebviewViewP
     }
 
     try {
-      this._fileWatcher = fs.watch(vaultFilePath, (eventType: any) => {
-        if (eventType === 'change' || eventType === 'rename') {
+      const vaultDir = path.dirname(vaultFilePath);
+      const vaultFileName = path.basename(vaultFilePath);
+      
+      this._fileWatcher = fs.watch(vaultDir, (eventType: any, filename: any) => {
+        if (filename === vaultFileName) {
           if (fs.existsSync(vaultFilePath)) {
             try {
               const fileData = fs.readFileSync(vaultFilePath, 'utf8');

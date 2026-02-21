@@ -1,6 +1,7 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
+import * as os from 'os';
 import SidebarMarkdownNotesProvider from './webviewProvider';
 
 // this method is called when your extension is activated
@@ -61,7 +62,9 @@ export function activate(context: vscode.ExtensionContext) {
         canSelectFiles: false,
         canSelectFolders: true,
         canSelectMany: false,
-        openLabel: 'Select Vault Directory'
+        openLabel: 'Select Local Vault Directory',
+        title: 'Select Local Notes Vault Directory',
+        defaultUri: vscode.Uri.file(os.homedir())
       });
 
       if (uri && uri[0]) {
