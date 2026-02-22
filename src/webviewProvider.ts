@@ -75,9 +75,10 @@ export default class SidebarMarkdownNotesProvider implements vscode.WebviewViewP
             }
           } else {
             // Write legacy state to vault (Migration)
-            this._lastSavedStateStr = JSON.stringify(data.value, null, 2);
+            const stateToSave = { ...data.value, ...this._getWorkspaceMetadata() };
+            this._lastSavedStateStr = JSON.stringify(stateToSave, null, 2);
             fs.writeFileSync(vaultFilePath, this._lastSavedStateStr, 'utf8');
-            this._view?.webview.postMessage({ type: 'loadState', value: data.value });
+            this._view?.webview.postMessage({ type: 'loadState', value: stateToSave });
           }
           this._startWatching(vaultFilePath);
           break;
@@ -91,7 +92,8 @@ export default class SidebarMarkdownNotesProvider implements vscode.WebviewViewP
           }
           
           const vaultFilePath = path.join(vaultDir, `notes_${workspaceHash}.json`);
-          this._lastSavedStateStr = JSON.stringify(data.value, null, 2);
+          const stateToSave = { ...data.value, ...this._getWorkspaceMetadata() };
+          this._lastSavedStateStr = JSON.stringify(stateToSave, null, 2);
           fs.writeFileSync(vaultFilePath, this._lastSavedStateStr, 'utf8');
           break;
         }
@@ -126,18 +128,26 @@ export default class SidebarMarkdownNotesProvider implements vscode.WebviewViewP
     if (workspaceFolders && workspaceFolders.length > 0) {
       const uri = workspaceFolders[0].uri;
       
-      // Instead of parsing the raw authority string which varies wildly depending on
-      // the VS Code fork (e.g., standard vs VSCodium hex-encoded JSON payloads),
-      // we use the natively provided vscode.env.remoteName (e.g., "ssh-remote") 
-      // alongside the workspace's human-readable name and standard folder path.
-      // This creates a robust, unique ID insensitive to connection protocol internals.
       const remoteType = vscode.env.remoteName || 'local';
       const workspaceName = vscode.workspace.name || '';
       
-      uriString = `${remoteType}:${workspaceName}:${uri.path}`;
+      uriString = `${remoteType}:${workspaceName}:${uri.path}`; // Keep the hash based on the same formula
     }
     
     return crypto.createHash('md5').update(uriString).digest('hex');
+  }
+
+  private _getWorkspaceMetadata(): any {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    const remoteType = vscode.env.remoteName || 'local';
+    const workspaceName = vscode.workspace.name || 'global';
+    const workspacePath = workspaceFolders && workspaceFolders.length > 0 ? workspaceFolders[0].uri.path : 'global';
+    
+    return {
+      workspaceName,
+      workspacePath,
+      remoteType
+    };
   }
 
   private _getVaultDir(): string {
