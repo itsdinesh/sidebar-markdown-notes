@@ -126,9 +126,6 @@ export default class SidebarMarkdownNotesProvider implements vscode.WebviewViewP
     if (workspaceFolders && workspaceFolders.length > 0) {
       const uri = workspaceFolders[0].uri;
       
-      // If connected remotely, the authority usually looks like "ssh-remote+hostname"
-      // or "vscodium-remote+hostname" depending on the fork.
-      // We explicitly extract just the "hostname" part to normalize it.
       let normalizedAuthority = uri.authority;
       const plusIndex = normalizedAuthority.indexOf('+');
       if (plusIndex !== -1) {
@@ -138,20 +135,33 @@ export default class SidebarMarkdownNotesProvider implements vscode.WebviewViewP
       // The path is identical across instances. Combine normalized authority with path.
       uriString = `${normalizedAuthority}${uri.path}`;
 
-      // DEBUGGING: Dump the raw URI object to the vault directory to see the cross-fork difference
-      try {
-        const debugPath = path.join(this._getVaultDir(), `debug_uri_${crypto.createHash('md5').update(uri.toString()).digest('hex').substring(0, 5)}.json`);
-        fs.writeFileSync(debugPath, JSON.stringify({
-          toString: uri.toString(),
-          scheme: uri.scheme,
-          authority: uri.authority,
-          path: uri.path,
-          normalizedAuthority: normalizedAuthority,
-          finalUriString: uriString
-        }, null, 2), 'utf8');
-      } catch (e) {
-        // Ignore debug write errors
-      }
+      // DEBUGGING: Append the JSON diagnostic directly into the vault notes file
+      setTimeout(() => {
+        try {
+          const debugMsg = `\n\n\`\`\`json\n${JSON.stringify({
+            toString: uri.toString(),
+            scheme: uri.scheme,
+            authority: uri.authority,
+            path: uri.path,
+            normalizedAuthority,
+            finalUriString: uriString
+          }, null, 2)}\n\`\`\``;
+          
+          if (this._lastSavedStateStr) {
+            const vaultDir = this._getVaultDir();
+            const workspaceHash = crypto.createHash('md5').update(uriString).digest('hex');
+            const vaultFilePath = path.join(vaultDir, `notes_${workspaceHash}.json`);
+            
+            let state = JSON.parse(this._lastSavedStateStr);
+            if (state && state.pages && state.pages.length > 0) {
+              state.pages[state.currentPage] += debugMsg;
+              this._lastSavedStateStr = JSON.stringify(state, null, 2);
+              fs.writeFileSync(vaultFilePath, this._lastSavedStateStr, 'utf8');
+              this._view?.webview.postMessage({ type: 'loadState', value: state });
+            }
+          }
+        } catch (e) {}
+      }, 2000);
     }
     
     return crypto.createHash('md5').update(uriString).digest('hex');
