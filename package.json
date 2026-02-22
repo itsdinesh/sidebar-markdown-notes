@@ -43,12 +43,21 @@
 	],
 	"main": "./dist/extension.js",
 	"contributes": {
+		"viewsContainers": {
+			"activitybar": [
+				{
+					"id": "sidebarMarkdownNotesContainer",
+					"title": "Notes",
+					"icon": "$(markdown)"
+				}
+			]
+		},
 		"views": {
-			"explorer": [
+			"sidebarMarkdownNotesContainer": [
 				{
 					"type": "webview",
 					"id": "sidebarMarkdownNotes.webview",
-					"name": "Sidebar markdown notes"
+					"name": "Notes"
 				}
 			]
 		},
