@@ -121,7 +121,7 @@ export default class SidebarMarkdownNotesProvider implements vscode.WebviewViewP
 
   private _getWorkspaceHash(): string {
     const workspaceFolders = vscode.workspace.workspaceFolders;
-    const uriString = workspaceFolders && workspaceFolders.length > 0 ? workspaceFolders[0].uri.toString() : 'global';
+    const uriString = workspaceFolders && workspaceFolders.length > 0 ? workspaceFolders[0].uri.path : 'global';
     return crypto.createHash('md5').update(uriString).digest('hex');
   }
 
