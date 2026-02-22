@@ -126,42 +126,15 @@ export default class SidebarMarkdownNotesProvider implements vscode.WebviewViewP
     if (workspaceFolders && workspaceFolders.length > 0) {
       const uri = workspaceFolders[0].uri;
       
-      let normalizedAuthority = uri.authority;
-      const plusIndex = normalizedAuthority.indexOf('+');
-      if (plusIndex !== -1) {
-        normalizedAuthority = normalizedAuthority.substring(plusIndex + 1);
-      }
+      // Instead of parsing the raw authority string which varies wildly depending on
+      // the VS Code fork (e.g., standard vs VSCodium hex-encoded JSON payloads),
+      // we use the natively provided vscode.env.remoteName (e.g., "ssh-remote") 
+      // alongside the workspace's human-readable name and standard folder path.
+      // This creates a robust, unique ID insensitive to connection protocol internals.
+      const remoteType = vscode.env.remoteName || 'local';
+      const workspaceName = vscode.workspace.name || '';
       
-      // The path is identical across instances. Combine normalized authority with path.
-      uriString = `${normalizedAuthority}${uri.path}`;
-
-      // DEBUGGING: Append the JSON diagnostic directly into the vault notes file
-      setTimeout(() => {
-        try {
-          const debugMsg = `\n\n\`\`\`json\n${JSON.stringify({
-            toString: uri.toString(),
-            scheme: uri.scheme,
-            authority: uri.authority,
-            path: uri.path,
-            normalizedAuthority,
-            finalUriString: uriString
-          }, null, 2)}\n\`\`\``;
-          
-          if (this._lastSavedStateStr) {
-            const vaultDir = this._getVaultDir();
-            const workspaceHash = crypto.createHash('md5').update(uriString).digest('hex');
-            const vaultFilePath = path.join(vaultDir, `notes_${workspaceHash}.json`);
-            
-            let state = JSON.parse(this._lastSavedStateStr);
-            if (state && state.pages && state.pages.length > 0) {
-              state.pages[state.currentPage] += debugMsg;
-              this._lastSavedStateStr = JSON.stringify(state, null, 2);
-              fs.writeFileSync(vaultFilePath, this._lastSavedStateStr, 'utf8');
-              this._view?.webview.postMessage({ type: 'loadState', value: state });
-            }
-          }
-        } catch (e) {}
-      }, 2000);
+      uriString = `${remoteType}:${workspaceName}:${uri.path}`;
     }
     
     return crypto.createHash('md5').update(uriString).digest('hex');
