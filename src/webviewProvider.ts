@@ -122,12 +122,21 @@ export default class SidebarMarkdownNotesProvider implements vscode.WebviewViewP
   private _getWorkspaceHash(): string {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     let uriString = 'global';
+    
     if (workspaceFolders && workspaceFolders.length > 0) {
       const uri = workspaceFolders[0].uri;
-      // Include authority (which represents the remote server host/IP) and path.
-      // E.g., for `vscode-remote://ssh-remote+myserver/home/user/project`
-      // authority is "ssh-remote+myserver" and path is "/home/user/project"
-      uriString = `${uri.authority}${uri.path}`;
+      
+      // If connected remotely, the authority usually looks like "ssh-remote+hostname"
+      // or "vscodium-remote+hostname" depending on the fork.
+      // We explicitly extract just the "hostname" part to normalize it.
+      let normalizedAuthority = uri.authority;
+      const plusIndex = normalizedAuthority.indexOf('+');
+      if (plusIndex !== -1) {
+        normalizedAuthority = normalizedAuthority.substring(plusIndex + 1);
+      }
+      
+      // The path is identical across instances. Combine normalized authority with path.
+      uriString = `${normalizedAuthority}${uri.path}`;
     }
     return crypto.createHash('md5').update(uriString).digest('hex');
   }
