@@ -137,7 +137,23 @@ export default class SidebarMarkdownNotesProvider implements vscode.WebviewViewP
       
       // The path is identical across instances. Combine normalized authority with path.
       uriString = `${normalizedAuthority}${uri.path}`;
+
+      // DEBUGGING: Dump the raw URI object to the vault directory to see the cross-fork difference
+      try {
+        const debugPath = path.join(this._getVaultDir(), `debug_uri_${crypto.createHash('md5').update(uri.toString()).digest('hex').substring(0, 5)}.json`);
+        fs.writeFileSync(debugPath, JSON.stringify({
+          toString: uri.toString(),
+          scheme: uri.scheme,
+          authority: uri.authority,
+          path: uri.path,
+          normalizedAuthority: normalizedAuthority,
+          finalUriString: uriString
+        }, null, 2), 'utf8');
+      } catch (e) {
+        // Ignore debug write errors
+      }
     }
+    
     return crypto.createHash('md5').update(uriString).digest('hex');
   }
 
